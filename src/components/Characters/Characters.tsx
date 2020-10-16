@@ -1,8 +1,8 @@
 import React, { Fragment, useEffect, useState } from "react";
 import Search from "../../shared/Search";
-import Detail from './Modal';
-
-import { Button, Col, Row, Card } from "react-bootstrap";
+import Detail from "./Modal";
+import Spinner from "../Spinner";
+import { Button, Col, Row, Card, Alert } from "react-bootstrap";
 
 import { gql, useLazyQuery } from "@apollo/client";
 type CharacterResult = {
@@ -14,9 +14,20 @@ type CharacterResult = {
   image: String;
 };
 
+type RequestInfo = {
+  next: number;
+  prev: number;
+};
+
 const CHARACTERS_RICKANDMORTY = gql`
-  query($name: String!) {
-    characters(filter: { name: $name }) {
+  query($name: String!, $page: Int) {
+    characters(filter: { name: $name }, page: $page) {
+      info {
+        pages
+        count
+        next
+        prev
+      }
       results {
         id
         name
@@ -31,6 +42,8 @@ const CHARACTERS_RICKANDMORTY = gql`
 
 const Characters = () => {
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [info, setInfo] = useState<RequestInfo>();
   const [listData, setListData] = useState([]);
 
   const [show, setShow] = useState(false);
@@ -45,7 +58,7 @@ const Characters = () => {
     setShow(false);
   };
 
-  const [getCharacters, { loading, data }] = useLazyQuery(
+  const [getCharacters, { loading, data, called, error }] = useLazyQuery(
     CHARACTERS_RICKANDMORTY
   );
 
@@ -53,13 +66,19 @@ const Characters = () => {
     setQuery(value);
   };
 
+  const prevPage = () => {
+    setCurrentPage(info.prev);
+  };
+
+  const nextPage = () => setCurrentPage(info.next);
+
   useEffect(() => {
     if (query.length > 2) {
-      getCharacters({ variables: { name: query } });
+      getCharacters({ variables: { name: query, page: currentPage } });
     } else if (query.length < 3 && listData.length > 0) {
       setListData([]);
     }
-  }, [query]);
+  }, [query, currentPage]);
 
   useEffect(() => {
     if (!loading && data) {
@@ -74,11 +93,23 @@ const Characters = () => {
         };
       });
       setListData(results);
+      setInfo(data.characters.info);
     }
-  }, [loading]);
+  }, [loading, data]);
 
   let resultsSearch = <p>Starting to write</p>;
-
+  if (called && loading)
+    return (
+      <div>
+        <Spinner />
+      </div>
+    );
+  if (error)
+    return (
+      <div>
+        <Alert variant="warning">No results founded</Alert>
+      </div>
+    );
   return (
     <Fragment>
       <Row>
@@ -87,7 +118,11 @@ const Characters = () => {
         </Col>
       </Row>
       <Row>
-        <Detail handleShow={show} character={characterSelected} handleClose={handleClose}/>
+        <Detail
+          handleShow={show}
+          character={characterSelected}
+          handleClose={handleClose}
+        />
         <Col md={12} style={{ display: "flex", flexWrap: "wrap" }}>
           {listData.length !== 0
             ? listData.map((el, index) => (
@@ -109,6 +144,35 @@ const Characters = () => {
                 </Card>
               ))
             : resultsSearch}
+        </Col>
+      </Row>
+      <Row>
+        <Col
+          md={12}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+          }}
+        >
+          {listData.length !== 0 ? (
+            <>
+              <Button
+                variant="primary"
+                disabled={!info.prev}
+                onClick={prevPage}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!info.next}
+                onClick={nextPage}
+              >
+                Next
+              </Button>
+            </>
+          ) : null}
         </Col>
       </Row>
     </Fragment>

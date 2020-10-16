@@ -1,8 +1,9 @@
 import React, { Fragment, useEffect, useState } from "react";
 import Search from "../../shared/Search";
 import Detail from "./Modal";
+import Spinner from "../Spinner";
 
-import { Button, Col, Row } from "react-bootstrap";
+import { Button, Col, Row, Alert } from "react-bootstrap";
 
 import { gql, useLazyQuery } from "@apollo/client";
 
@@ -17,10 +18,20 @@ type LocationsResult = {
   dimension: String;
   residents: [Character];
 };
+type RequestInfo = {
+  next: number;
+  prev: number;
+};
 
 const LOCATIONS_RICKANDMORTY = gql`
-  query($name: String!) {
-    locations(filter: { name: $name }) {
+  query($name: String!, $page: Int) {
+    locations(filter: { name: $name }, page: $page) {
+      info {
+        pages
+        count
+        next
+        prev
+      }
       results {
         id
         name
@@ -37,6 +48,8 @@ const LOCATIONS_RICKANDMORTY = gql`
 
 const Locations = () => {
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [info, setInfo] = useState<RequestInfo>();
   const [listData, setListData] = useState([]);
   const [show, setShow] = useState(false);
   const [locationSelected, setLocationSelected]: any = useState([]);
@@ -52,20 +65,25 @@ const Locations = () => {
     setShow(false);
   };
 
-  const [getLocations, { loading, data }] = useLazyQuery(
+  const [getLocations, { loading, data, called, error }] = useLazyQuery(
     LOCATIONS_RICKANDMORTY
   );
   const handleInput = (value) => {
     setQuery(value);
   };
+  const prevPage = () => {
+    setCurrentPage(info.prev);
+  };
+
+  const nextPage = () => setCurrentPage(info.next);
 
   useEffect(() => {
     if (query.length > 2) {
-      getLocations({ variables: { name: query } });
+      getLocations({ variables: { name: query, page: currentPage } });
     } else if (query.length < 3 && listData.length > 0) {
       setListData([]);
     }
-  }, [query]);
+  }, [query,currentPage]);
 
   useEffect(() => {
     if (!loading && data) {
@@ -84,11 +102,23 @@ const Locations = () => {
         };
       });
       setListData(results);
+      setInfo(data.locations.info);
     }
-  }, [loading]);
+  }, [loading,data]);
 
   let resultsSearch = <p>Starting to write</p>;
-
+  if (called && loading)
+    return (
+      <div>
+        <Spinner />
+      </div>
+    );
+  if (error)
+    return (
+      <div>
+        <Alert variant="warning">No results founded</Alert>
+      </div>
+    );
   return (
     <Fragment>
       <Row>
@@ -123,12 +153,41 @@ const Locations = () => {
                   >
                     {el.name}
                   </Button>
-                  <p style={{textAlign:"center"}}>
+                  <p style={{ textAlign: "center" }}>
                     <small>{el.dimension}</small>
                   </p>
                 </div>
               ))
             : resultsSearch}
+        </Col>
+      </Row>
+      <Row>
+        <Col
+          md={12}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+          }}
+        >
+          {listData.length !== 0 ? (
+            <>
+              <Button
+                variant="primary"
+                disabled={!info.prev}
+                onClick={prevPage}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!info.next}
+                onClick={nextPage}
+              >
+                Next
+              </Button>
+            </>
+          ) : null}
         </Col>
       </Row>
     </Fragment>

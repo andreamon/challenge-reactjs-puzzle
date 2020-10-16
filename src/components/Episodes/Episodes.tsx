@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useState } from "react";
 import Search from "../../shared/Search";
 import Detail from "./Modal";
-import Spinner from '../Spinner'
+import Spinner from "../Spinner";
 
 import { Alert, Button, Col, Row } from "react-bootstrap";
 
@@ -18,10 +18,19 @@ type EpisodesResult = {
   air_date: String;
   characters: [Character];
 };
-
+type RequestInfo = {
+  next: number;
+  prev: number;
+};
 const EPISODES_RICKANDMORTY = gql`
-  query($name: String!) {
-    episodes(filter: { name: $name }) {
+  query($name: String!, $page: Int) {
+    episodes(filter: { name: $name }, page: $page) {
+      info {
+        pages
+        count
+        next
+        prev
+      }
       results {
         id
         name
@@ -38,6 +47,8 @@ const EPISODES_RICKANDMORTY = gql`
 
 const Episodes = () => {
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [info, setInfo] = useState<RequestInfo>();
   const [listData, setListData] = useState([]);
   const [show, setShow] = useState(false);
   const [episodeSelected, setEpisodeSelected]: any = useState([]);
@@ -53,19 +64,26 @@ const Episodes = () => {
     setShow(false);
   };
 
-  const [getEpisodes, { loading, data, called, error }] = useLazyQuery(EPISODES_RICKANDMORTY);
+  const [getEpisodes, { loading, data, called, error }] = useLazyQuery(
+    EPISODES_RICKANDMORTY
+  );
 
   const handleInput = (value) => {
     setQuery(value);
   };
 
+  const prevPage = () => {
+    setCurrentPage(info.prev);
+  };
+
+  const nextPage = () => setCurrentPage(info.next);
   useEffect(() => {
     if (query.length > 2) {
-      getEpisodes({ variables: { name: query } });
+      getEpisodes({ variables: { name: query, page: currentPage } });
     } else if (query.length < 3 && listData.length > 0) {
       setListData([]);
     }
-  }, [query]);
+  }, [query, currentPage]);
 
   useEffect(() => {
     if (!loading && data) {
@@ -84,12 +102,23 @@ const Episodes = () => {
         };
       });
       setListData(results);
+      setInfo(data.episodes.info);
     }
-  }, [loading]);
+  }, [loading, data]);
 
   let resultsSearch = <p>Starting to write</p>;
-  if (called && loading) return <div><Spinner /></div>;
-  if (error) return <div><Alert variant="danger">An error has occurred</Alert></div>
+  if (called && loading)
+    return (
+      <div>
+        <Spinner />
+      </div>
+    );
+  if (error)
+    return (
+      <div>
+        <Alert variant="warning">No results founded</Alert>
+      </div>
+    );
 
   return (
     <Fragment>
@@ -131,6 +160,35 @@ const Episodes = () => {
                 </div>
               ))
             : resultsSearch}
+        </Col>
+      </Row>
+      <Row>
+        <Col
+          md={12}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+          }}
+        >
+          {listData.length !== 0 ? (
+            <>
+              <Button
+                variant="primary"
+                disabled={!info.prev}
+                onClick={prevPage}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!info.next}
+                onClick={nextPage}
+              >
+                Next
+              </Button>
+            </>
+          ) : null}
         </Col>
       </Row>
     </Fragment>
