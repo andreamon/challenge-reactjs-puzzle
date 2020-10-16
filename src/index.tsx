@@ -2,8 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom";
 import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
 
-import "./index.css";
 import App from "./App";
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+import "./index.css";
 import * as serviceWorker from "./serviceWorker";
 
 //Se crea el cliente que apunta a la API
